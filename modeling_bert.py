@@ -258,6 +258,7 @@ class BertForCL(BertPreTrainedModel):
         ) / self.temp
         
         loss = self.calc_loss(None, None, pos_sim_vec, neg_sim_mat)
+        sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
         if not return_dict:
             return (
                 (loss, sim_mat),
