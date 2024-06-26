@@ -105,6 +105,7 @@ class BertForCL(BertPreTrainedModel):
         self.bert = BertModel(config, add_pooling_layer=False)
         self.pooler = BertPoolerForCL(config)
         self.temp = self.config.temp
+        assert self.config.loss_func in ['ce', 'bce', 'logsumexp']
 
         # 调用 `cl_init` 函数进行其他自定义初始化
         self.init_weights()
