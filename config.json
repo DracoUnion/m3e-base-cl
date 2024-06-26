@@ -34,6 +34,7 @@
   "return_dict": true,
   "vocab_size": 21128,
   "pooler_type": "avg",
-  "temp": 1.0
+  "temp": 1.0,
+  "loss_func": "bce"
   
 }

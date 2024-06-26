@@ -89,7 +89,7 @@ class BertPoolerForCL(nn.Module):
             pooler_res = ((pooler_res * attention_mask_3d).sum(1) / attention_mask_3d.sum(1)) 
         # 如果池化器类型不在已知的类型中，则抛出未实现的错误
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'pooler type cannot be {self.pooler_type}')
         return pooler_res
         
         
@@ -109,6 +109,27 @@ class BertForCL(BertPreTrainedModel):
         # 调用 `cl_init` 函数进行其他自定义初始化
         self.init_weights()
         
+    def calc_loss(self, sim_mat, labels, pos_sim_vec, neg_sim_mat):
+        if sim_mat is None:
+            sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
+            labels = torch.zeros(sim_mat.shape[0], dtype=torch.long, device=sim_mat.device)
+        if pos_sim_vec is None:
+            idcs = torch.arange(sim_mat.shape[0], device=sim_mat.device)
+            pos_sim_vec = sim_mat[idcs, labels].unsqueeze(-1)
+            mask = torch.nn.functional.one_hot(labels, sim_mat.shape[1]).to(bool)
+            neg_sim_mat = torch.masked_fill(sim_mat, mask, -1e9)
+        
+        if self.config.loss_func == 'ce':
+            loss = torch.nn.functional.cross_entropy(sim_mat, labels)
+        elif self.config.loss_func == 'bce':
+            loss = - torch.nn.functional.logsigmoid(pos_sim_vec - neg_sim_mat).mean()
+        elif self.config.loss_func == 'logsumexp':
+            loss = torch.logsumexp(neg_sim_mat - pos_sim_vec).mean()
+        else:
+            raise NotImplementedError(f'loss func cannot be {self.config.loss_func}')
+        
+        return loss
+
     def forward(
         self,
         input_ids=None,
@@ -189,7 +210,8 @@ class BertForCL(BertPreTrainedModel):
                 dtype=torch.long, 
                 device=sim_mat.device,
             )
-            loss = torch.nn.functional.cross_entropy(sim_mat, labels)
+            loss = self.calc_loss(sim_mat, labels, None, None)
+
             if not return_dict:
                 return (
                     (loss, sim_mat),
@@ -235,9 +257,7 @@ class BertForCL(BertPreTrainedModel):
             neg_pooler_res.unsqueeze(0), -1
         ) / self.temp
         
-        sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
-        labels = torch.zeros(sim_mat.shape[0], dtype=torch.long, device=sim_mat.device)
-        loss = torch.nn.functional.cross_entropy(sim_mat, labels)
+        loss = self.calc_loss(None, None, pos_sim_vec, neg_sim_mat)
         if not return_dict:
             return (
                 (loss, sim_mat),
