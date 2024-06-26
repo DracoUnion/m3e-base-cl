@@ -33,8 +33,8 @@
   "use_cache": true,
   "return_dict": true,
   "vocab_size": 21128,
-  "pooler_type": "avg",
-  "temp": 1.0,
-  "loss_func": "bce"
+  "pooler_type": "cls",
+  "temp": 0.05,
+  "loss_func": "ce"
   
 }
