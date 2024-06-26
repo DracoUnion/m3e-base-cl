@@ -124,7 +124,7 @@ class BertForCL(BertPreTrainedModel):
         elif self.config.loss_func == 'bce':
             loss = - torch.nn.functional.logsigmoid(pos_sim_vec - neg_sim_mat).mean()
         elif self.config.loss_func == 'logsumexp':
-            loss = torch.logsumexp(neg_sim_mat - pos_sim_vec).mean()
+            loss = torch.logsumexp(neg_sim_mat - pos_sim_vec, -1).mean()
         else:
             raise NotImplementedError(f'loss func cannot be {self.config.loss_func}')
         
