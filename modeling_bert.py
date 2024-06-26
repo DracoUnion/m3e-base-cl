@@ -109,11 +109,8 @@ class BertForCL(BertPreTrainedModel):
         # 调用 `cl_init` 函数进行其他自定义初始化
         self.init_weights()
         
-    def calc_loss(self, sim_mat, labels, pos_sim_vec, neg_sim_mat):
-        if sim_mat is None:
-            sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
-            labels = torch.zeros(sim_mat.shape[0], dtype=torch.long, device=sim_mat.device)
-        if pos_sim_vec is None:
+    def calc_loss(self, sim_mat, labels):
+        if self.config.loss_func != 'ce':
             idcs = torch.arange(sim_mat.shape[0], device=sim_mat.device)
             pos_sim_vec = sim_mat[idcs, labels].unsqueeze(-1)
             mask = torch.nn.functional.one_hot(labels, sim_mat.shape[1]).to(bool)
@@ -210,7 +207,7 @@ class BertForCL(BertPreTrainedModel):
                 dtype=torch.long, 
                 device=sim_mat.device,
             )
-            loss = self.calc_loss(sim_mat, labels, None, None)
+            loss = self.calc_loss(sim_mat, labels)
 
             if not return_dict:
                 return (
@@ -256,9 +253,9 @@ class BertForCL(BertPreTrainedModel):
             pooler_res.unsqueeze(1),
             neg_pooler_res.unsqueeze(0), -1
         ) / self.temp
-        
-        loss = self.calc_loss(None, None, pos_sim_vec, neg_sim_mat)
         sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
+        labels = torch.zeros(sim_mat.shape[0], dtype=torch.long, device=sim_mat.device)
+        loss = self.calc_loss(sim_mat, labels)
         if not return_dict:
             return (
                 (loss, sim_mat),
