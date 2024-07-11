@@ -110,15 +110,18 @@ class BertForCL(BertPreTrainedModel):
         # 调用 `cl_init` 函数进行其他自定义初始化
         self.init_weights()
         
-    def calc_loss(self, sim_mat, labels):
+    def calc_loss(self, sim_mat, labels, ignore_idx=-100):
         if self.config.loss_func != 'ce':
+            label_mask = labels != ignore_idx
+            sim_mat = sim_mat[label_mask]
+            labels = labels[label_mask]
             idcs = torch.arange(sim_mat.shape[0], device=sim_mat.device)
             pos_sim_vec = sim_mat[idcs, labels].unsqueeze(-1)
             mask = torch.nn.functional.one_hot(labels, sim_mat.shape[1]).to(bool)
             neg_sim_mat = torch.masked_fill(sim_mat, mask, -1e9)
         
         if self.config.loss_func == 'ce':
-            loss = torch.nn.functional.cross_entropy(sim_mat, labels)
+            loss = torch.nn.functional.cross_entropy(sim_mat, labels, ignore_index=ignore_idx)
         elif self.config.loss_func == 'bce':
             loss = - torch.nn.functional.logsigmoid(pos_sim_vec - neg_sim_mat).mean()
         elif self.config.loss_func == 'logsumexp':
@@ -137,6 +140,7 @@ class BertForCL(BertPreTrainedModel):
         head_mask=None,
         inputs_embeds=None,
         labels=None,
+        ignore_idx=-100,
         pos_input_ids=None,
         pos_attention_mask=None,
         pos_token_type_ids=None,
@@ -281,6 +285,72 @@ class BertForCL(BertPreTrainedModel):
             neg_attentions=neg_bert_res.attentions,
         )
         
+    def forward_clsf(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        ignore_idx=-100,
+        category_input_ids=None,
+        category_attention_mask=None,
+        category_token_type_ids=None,
+        category_position_ids=None,
+        category_head_mask=None,
+        category_inputs_embeds=None,        
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.return_dict
         
-        
-        
+        bert_res = self.bert(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=True,
+            return_dict=True,
+        )
+
+        pooler_res = self.pooler(bert_res, attention_mask)
+
+        cate_bert_res = self.bert(
+            cate_input_ids=input_ids,
+            cate_attention_mask=attention_mask,
+            cate_token_type_ids=token_type_ids,
+            cate_position_ids=position_ids,
+            cate_head_mask=head_mask,
+            cate_inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=True,
+            return_dict=True,
+        )
+        cate_pooler_res = self.pooler(cate_bert_res, category_attention_mask)
+
+        sim_mat = torch.cosine_similarity(
+            pooler_res.unsqueeze(1),
+            cate_pooler_res.unsqueeze(0), -1
+        ) / self.temp
+
+        loss = self.calc_loss(sim_mat, labels, ignore_idx)
+        return CLOutput(
+            loss=loss,
+            logits=sim_mat,
+            pooler_output=pooler_res,
+            last_hidden_state=bert_res.last_hidden_state,
+            hidden_states=bert_res.hidden_states if output_hidden_states else None,
+            attentions=bert_res.attentions,
+            pos_pooler_output=cate_pooler_res,
+            pos_last_hidden_state=cate_bert_res.last_hidden_state,
+            pos_hidden_states=cate_bert_res.hidden_states if output_hidden_states else None,
+            pos_attentions=cate_bert_res.attentions,
+        )
+            
