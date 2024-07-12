@@ -140,7 +140,6 @@ class BertForCL(BertPreTrainedModel):
         head_mask=None,
         inputs_embeds=None,
         labels=None,
-        ignore_idx=-100,
         pos_input_ids=None,
         pos_attention_mask=None,
         pos_token_type_ids=None,
