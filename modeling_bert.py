@@ -307,12 +307,12 @@ class BertForCL(BertPreTrainedModel):
         pooler_res = self.pooler(bert_res, attention_mask)
 
         cate_bert_res = self.bert(
-            cate_input_ids=category_input_ids,
-            cate_attention_mask=category_attention_mask,
-            cate_token_type_ids=category_token_type_ids,
-            cate_position_ids=category_position_ids,
-            cate_head_mask=category_head_mask,
-            cate_inputs_embeds=category_inputs_embeds,
+            input_ids=category_input_ids,
+            attention_mask=category_attention_mask,
+            token_type_ids=category_token_type_ids,
+            position_ids=category_position_ids,
+            head_mask=category_head_mask,
+            inputs_embeds=category_inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=True,
             return_dict=True,
