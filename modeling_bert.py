@@ -178,8 +178,6 @@ class BertForCL(BertPreTrainedModel):
         
         if pos_input_ids is None:
             # 不提供正面句子，仅仅执行嵌入提取
-            if not return_dict:
-                return (bert_res[0], pooler_res) + bert_res[2:]
             return CLOutput(
                 pooler_output=pooler_res,
                 last_hidden_state=bert_res.last_hidden_state,
@@ -214,12 +212,6 @@ class BertForCL(BertPreTrainedModel):
             )
             loss = self.calc_loss(sim_mat, labels)
 
-            if not return_dict:
-                return (
-                    (loss, sim_mat),
-                    (bert_res[0], pooler_res) + bert_res[2:],
-                    (pos_bert_res[0], pos_pooler_res) + pos_bert_res[2:]
-                )
             return CLOutput(
                 loss=loss,
                 logits=sim_mat,
@@ -261,13 +253,6 @@ class BertForCL(BertPreTrainedModel):
         sim_mat = torch.cat([pos_sim_vec, neg_sim_mat], -1)
         labels = torch.zeros(sim_mat.shape[0], dtype=torch.long, device=sim_mat.device)
         loss = self.calc_loss(sim_mat, labels)
-        if not return_dict:
-            return (
-                (loss, sim_mat),
-                (bert_res[0], pooler_res) + bert_res[2:],
-                (pos_bert_res[0], pos_pooler_res) + pos_bert_res[2:],
-                (neg_bert_res[0], neg_pooler_res) + neg_bert_res[2:]
-            )
         return CLOutput(
             loss=loss,
             logits=sim_mat,
